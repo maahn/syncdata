@@ -51,40 +51,6 @@ python syncdata.py visss1_follower_data@icn
 python syncdata.py cron
 ```
 
-## Realtime Data Tool
-
-The `realtimedata.py` script fetches real-time status files and reports from instruments via SCP.
-
-### Usage
-
-```bash
-# Fetch real-time data from all configured instruments
-python realtimedata.py
-
-# Fetch real-time data from a specific instrument
-python realtimedata.py <instrument_name>
-```
-
-### Realtime Configuration Options
-
-Add these options to instrument JSON files to enable real-time data fetching:
-
-| Option | Description |
-|--------|-------------|
-| `realtimePath` | Local directory to store fetched files |
-| `realtimeFiles` | List of remote file paths to fetch |
-| `realtimeReport` | Remote command to generate a status report (output saved as HTML) |
-
-### Example Configuration
-
-```json
-{
-  "realtimePath": "/path/to/quicklooks/",
-  "realtimeFiles": ["/remote/path/status.txt", "/remote/path/latest.jpg"],
-  "realtimeReport": "/home/user/scripts/generate_report.sh"
-}
-```
-
 ## Configuration
 
 Instrument configurations are stored as JSON files in the `instruments/` directory, named `<instrument_name>@<site_code>.json`. Site-specific configs are git-ignored; to add an instrument, copy the template and edit it:
@@ -142,6 +108,40 @@ Files not ending in `.json` (such as the template) are ignored by the scripts. `
 | `channel` | Mattermost channel for notifications (empty to disable) |
 | `chmod` | rsync `--chmod` value for transferred files/dirs (default: `F644,D755`) |
 | `group` | Local group ownership for transferred files (default: `drops`; set to `""` to disable, as in the template) |
+
+## Realtime Data Tool
+
+The `realtimedata.py` script fetches real-time status files and reports from instruments via SCP.
+
+### Usage
+
+```bash
+# Fetch real-time data from all configured instruments
+python realtimedata.py
+
+# Fetch real-time data from a specific instrument
+python realtimedata.py <instrument_name>
+```
+
+### Realtime Configuration Options
+
+Add these options to instrument JSON files to enable real-time data fetching:
+
+| Option | Description |
+|--------|-------------|
+| `realtimePath` | Local directory to store fetched files |
+| `realtimeFiles` | List of remote file paths to fetch |
+| `realtimeReport` | Remote command to generate a status report (output saved as HTML) |
+
+### Example Configuration
+
+```json
+{
+  "realtimePath": "/path/to/quicklooks/",
+  "realtimeFiles": ["/remote/path/status.txt", "/remote/path/latest.jpg"],
+  "realtimeReport": "/home/user/scripts/generate_report.sh"
+}
+```
 
 ## Rsync Behavior
 
@@ -221,4 +221,10 @@ Remove stale locks manually if needed (ensure no sync is running).
 
 ## Authors
 
+(c) M. Maahn, 2012-2026
+
 University of Leipzig - Meteorology Department
+
+## License
+
+GNU General Public License v3.0, see [LICENSE](LICENSE).
