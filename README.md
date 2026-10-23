@@ -182,9 +182,14 @@ All keys are optional; the file itself is optional.
 
 ## Crontab Setup
 
-Example crontab entry to run every hour:
+Example crontab entry to run the data sync every hour:
 ```cron
 0 * * * * /usr/bin/python3 /path/to/syncdata/syncdata.py cron >> /path/to/syncdata/syncdata.py.log 2>&1
+```
+
+Example crontab entry to fetch real-time data every 10 minutes (at minutes 1, 11, 21, ...):
+```cron
+1-59/10 * * * * /path/to/python3 /path/to/syncdata/realtimedata.py > /path/to/syncdata/realtimedata.py.log 2>&1
 ```
 
 ## Directory Structure
