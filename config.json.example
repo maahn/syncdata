@@ -1,0 +1,8 @@
+{
+  "mattermostWebhookUrl": "https://mattermost.example.com/hooks/xxxxxxxxxxxxxxxx",
+  "smtpServer": "localhost",
+  "smtpPort": 25,
+  "senderEmail": "noreply@example.com",
+  "smtpPassword": null,
+  "root": "/path/to/syncdata"
+}

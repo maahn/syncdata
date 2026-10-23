@@ -1,0 +1,38 @@
+# Lock files
+*.lock
+
+# Log files
+*.log
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# macOS metadata
+._*
+.DS_Store
+
+# Debug/temp files
+debug_*.py
+debug_*.txt
+
+# Editor files
+*.swp
+*.swo
+*~
+
+# Local tool settings and logs
+.claude/
+logs/
+*.lock
+.env
+
+# Site-specific instrument configs are not published; copy instruments/template@site.json.example
+instruments/*.json
+instruments/archive/
+instruments/skipping/
+
+# Local settings with secrets; copy config.json.example
+config.json

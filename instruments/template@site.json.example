@@ -1,0 +1,23 @@
+{
+  "user": "username",
+  "host": "remote.example.com",
+  "sshOptions": "-p 22",
+  "rsyncOptions": "--exclude='*.txt'",
+  "CallOnComplete": "",
+  "CallOnCompleteSSH": "",
+  "CallOnCompleteTimeout": 0,
+  "CallOnCompleteLog": "",
+  "CallOnCompleteWait": false,
+  "remotePath": "/remote/data/path/",
+  "localPath": "/local/data/path/",
+  "monthString": "%Y/%m",
+  "dayString": "%d",
+  "hoursForDaySync": [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22],
+  "hoursForMonthSync": [0],
+  "channel": "",
+  "realtimeFiles": ["/remote/path/latest.jpg"],
+  "realtimePath": "/local/quicklooks/",
+  "realtimeReport": "/remote/scripts/statusReport.sh",
+  "chmod": "F644,D755",
+  "group": ""
+}
