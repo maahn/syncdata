@@ -224,6 +224,15 @@ Remove stale locks manually if needed (ensure no sync is running).
 - Check SSH key authentication is configured
 - Verify network/firewall settings
 
+## Tests
+
+```bash
+pip install pytest
+python3 -m pytest tests -q
+```
+
+The tests replace `ssh`, `rsync` and Mattermost with fakes, so no real instrument or webhook is touched.
+
 ## Authors
 
 (c) M. Maahn, 2012-2026

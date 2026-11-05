@@ -96,6 +96,8 @@ pip install numpy requests filelock loguru paramiko scp
 
 ## Testing Approach
 
+Run the tests with `python3 -m pytest tests -q`. `tests/conftest.py` replaces ssh, rsync and Mattermost, so no real instrument or webhook is touched.
+
 When modifying the sync logic, be aware that:
 - The tool is designed to run in cron and should handle transient failures gracefully
 - Changes to rsync command construction (syncdata.py:304-307) affect all instruments

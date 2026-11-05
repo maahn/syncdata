@@ -11,8 +11,8 @@ import smtplib
 import ssl
 import subprocess
 import sys
+import tempfile
 import time
-import traceback
 
 # from dateutil.relativedelta import relativedelta
 from copy import deepcopy
@@ -24,8 +24,11 @@ from loguru import logger
 
 
 sshTimeout = 45  # seconds
+mattermostTimeout = 10  # seconds
 daysAgo = 3
 monthsAgo = 2
+RSYNC_BIN = "/usr/bin/rsync"
+LOCK_DIR = os.path.dirname(os.path.realpath(__file__))
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
@@ -97,6 +100,52 @@ def execute_stdout(command):
     return process.returncode, output
 
 
+def checkConnection(command):
+    """Open and immediately close an ssh connection, raise if that fails.
+
+    The ssh output is collected in a file and not in a pipe: with
+    ControlPersist the background master keeps stdout/stderr open, so reading
+    a pipe until EOF would block until the master exits. Printing the output
+    also puts the failure reason into the history log, which output of the
+    child process would otherwise bypass.
+    """
+    with tempfile.TemporaryFile(mode="w+") as outputFile:
+        try:
+            subprocess.run(
+                command.split(),
+                stdout=outputFile,
+                stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
+                check=True,
+                # ConnectTimeout does not cover a hang after the TCP connect
+                timeout=sshTimeout + 15,
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as err:
+            outputFile.seek(0)
+            err.output = outputFile.read().strip()
+            print("connection failed: %s" % (err.output or err))
+            raise
+
+
+def connectionErrorBody(instrument, err):
+    reason = getattr(err, "output", None) or str(err)
+    return "No connection to %s\n\n%s\n" % (instrument, reason)
+
+
+def monthStrings(now, monthsAgo, monthString):
+    """Format the months from monthsAgo months before now up to now, oldest first.
+
+    Uses calendar months: subtracting multiples of 30 days skips or repeats
+    months, e.g. February when starting from March 31.
+    """
+    strings = []
+    for mm in range(monthsAgo, -1, -1):
+        totalMonths = now.year * 12 + (now.month - 1) - mm
+        year, month = divmod(totalMonths, 12)
+        strings.append(datetime.date(year, month + 1, 1).strftime(monthString))
+    return strings
+
+
 def monthSync(monthsAgo, **kwargs):
     print("month sync start")
 
@@ -108,10 +157,10 @@ def monthSync(monthsAgo, **kwargs):
     assert "rsyncOptions" in list(kwargs.keys())
 
     transferredBytes = 0
-    lockfile = "%s/syncdata.%s.lock" % (
-        os.path.dirname(os.path.realpath(__file__)),
-        kwargs["instrument"],
-    )
+    c = ""
+    s = ""
+    e = None
+    lockfile = "%s/syncdata.%s.lock" % (LOCK_DIR, kwargs["instrument"])
     lock = FileLock(lockfile, timeout=1)
 
     # Connection test before the sync. Open ssh to host and exit immediatelly.
@@ -143,18 +192,12 @@ def monthSync(monthsAgo, **kwargs):
                 )
                 print("connecting to %s, lockfile %s" % (command, lockfile))
 
-                subprocess.check_call(command.split())
+                checkConnection(command)
                 print("connection o.k.")
 
-                c = ""
-                s = ""
-                e = None
-
-                for mm in list(range(0, monthsAgo + 1))[::-1]:
-                    mmString = (
-                        datetime.datetime.utcnow() - datetime.timedelta(days=mm * 30)
-                    ).strftime(kwargs["monthString"])
-
+                for mmString in monthStrings(
+                    datetime.datetime.utcnow(), monthsAgo, kwargs["monthString"]
+                ):
                     mmRemotePath = "%s/%s/" % (remotePath, mmString)
                     mmLocalPath = "%s/%s/" % (localPath, mmString)
 
@@ -170,12 +213,9 @@ def monthSync(monthsAgo, **kwargs):
                     )
                     transferredBytes += b
 
-    except subprocess.CalledProcessError as err:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as err:
         print("connection error.")
-        body = "No connection to %s \n \n" % kwargs["instrument"]
-        body += "\n".join(
-            traceback.format_list(traceback.extract_tb(err.__traceback__))
-        )
+        body = connectionErrorBody(kwargs["instrument"], err)
         # writeEmail(kwargs["email"], "Syncdata error %s" % kwargs["instrument"], body)
         postToMattermost(kwargs["channel"], kwargs["instrument"], body)
     except Timeout:
@@ -214,10 +254,10 @@ def daySync(daysAgo, **kwargs):
     assert "rsyncOptions" in list(kwargs.keys())
 
     transferredBytes = 0
-    lockfile = "%s/syncdata.%s.lock" % (
-        os.path.dirname(os.path.realpath(__file__)),
-        kwargs["instrument"],
-    )
+    c = ""
+    s = ""
+    e = None
+    lockfile = "%s/syncdata.%s.lock" % (LOCK_DIR, kwargs["instrument"])
     lock = FileLock(lockfile, timeout=1)
 
     # Connection test before the sync. Open ssh to host and exit immediatelly.
@@ -249,7 +289,7 @@ def daySync(daysAgo, **kwargs):
                 )
                 print("connecting to %s, lockfile %s" % (command, lockfile))
 
-                subprocess.check_call(command.split())
+                checkConnection(command)
                 print("connection o.k.")
 
                 for dd in list(range(0, daysAgo + 1))[::-1]:
@@ -275,11 +315,9 @@ def daySync(daysAgo, **kwargs):
                     )
                     transferredBytes += b
             print("day transfer done, transferred %i bytes" % transferredBytes)
-    except subprocess.CalledProcessError as err:
-        body = "Connection error for %s\n" % kwargs["instrument"]
-        body += "\n".join(
-            traceback.format_list(traceback.extract_tb(err.__traceback__))
-        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as err:
+        print("connection error.")
+        body = connectionErrorBody(kwargs["instrument"], err)
         # writeEmail(kwargs["email"], "Syncdata error %s" % kwargs["instrument"], body)
         postToMattermost(kwargs["channel"], kwargs["instrument"], body)
 
@@ -313,28 +351,33 @@ def sync(LocalPath, RemotePath, sshOptions, user, host, rsyncOptions, chmod="F64
     try:
         mkdir_p(LocalPath)
     except:
-        print("failed: Cannot create directory", LocalPath)
-        return "failed: Cannot create directory", LocalPath
+        error = "failed: Cannot create directory %s" % LocalPath
+        print(error)
+        return "", error, 0, ""
 
     print(datetime.datetime.utcnow().strftime("%y%m%d %H:%M"), "syncing... ")
 
     chownOpt = "--chown=:%s" % group if group else ""
     chmodOpt = "--chmod=%s" % chmod if chmod else ""
     command = (
-        "/usr/bin/rsync -vrlt --modify-window=2 %s %s --stats --timeout=%s %s -e 'ssh %s' %s@%s:%s %s"
-        % (chmodOpt, chownOpt, sshTimeout, rsyncOptions, sshOptions, user, host, RemotePath, LocalPath)
+        "%s -vrlt --modify-window=2 %s %s --stats --timeout=%s %s -e 'ssh %s' %s@%s:%s %s"
+        % (RSYNC_BIN, chmodOpt, chownOpt, sshTimeout, rsyncOptions, sshOptions, user, host, RemotePath, LocalPath)
     )
     print(command)
+    syncResult = ""
+    error = None
+    transferredBytes = 0
     try:
         errorcode, syncResult = execute_stdout(command)
-        error = None
     except Exception as Argument:
         print(Argument)
         error = str(Argument)
-
-    if errorcode != 0:
-        transferredBytes = 0
     else:
+        if errorcode != 0:
+            error = "rsync exit code %i for %s" % (errorcode, RemotePath)
+            print(error)
+        # rsync reports stats also after partial failures such as code 23, and
+        # what it transferred before a failure is on disk either way
         transferredBytes = parseRsyncOutput(syncResult)
 
     try:
@@ -382,9 +425,13 @@ def postToMattermost(channel, instrument, text):
         "text": header + text,
     }
     message = json.dumps(message)
-    # Send payload as HTTP Post Request to Webhook URL
-    r = requests.post(url, data=message)
-    r.raise_for_status()
+    # Send payload as HTTP Post Request to Webhook URL. A notification problem
+    # must never stop the sync of the remaining instruments.
+    try:
+        r = requests.post(url, data=message, timeout=mattermostTimeout)
+        r.raise_for_status()
+    except requests.RequestException as err:
+        print("failed to post to Mattermost: %s" % err)
     return
 
 
