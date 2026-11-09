@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "syncdata"
+version = "1.0.0"
+description = "Synchronise instrument data over ssh/rsync, with a status GUI and Mattermost alerts"
+readme = "README.md"
+license = { text = "GPL-3.0" }
+requires-python = ">=3.8"
+authors = [{ name = "M. Maahn" }]
+dependencies = [
+    "requests",
+    "filelock",
+    "loguru",
+    "paramiko",
+    "scp",
+    "numpy",
+]
+
+[project.optional-dependencies]
+gui = ["textual"]
+
+[project.scripts]
+syncdata = "syncdata:main"
+syncdata-tui = "synctui:main"
+syncdata-alerts = "alerts:main"
+syncdata-realtime = "realtimedata:main"
+
+[tool.setuptools]
+# Flat layout: the modules stay where python3 syncdata.py works unchanged.
+py-modules = ["syncdata", "syncstate", "statusview", "synctui", "alerts", "realtimedata"]

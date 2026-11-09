@@ -14,6 +14,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import syncdata  # noqa: E402
+import syncstate  # noqa: E402
 
 FAKE_SSH = """#!/bin/sh
 [ -n "$FAKE_SSH_BACKGROUND" ] && sleep "$FAKE_SSH_BACKGROUND" &
@@ -23,6 +24,13 @@ exit "${FAKE_SSH_EXIT:-0}"
 """
 
 FAKE_RSYNC = """#!/bin/sh
+if [ "$1" = "--version" ]; then
+  # no call log for the version check; progress support only when told
+  if [ -n "$FAKE_RSYNC_VERSION" ]; then
+    echo "rsync version $FAKE_RSYNC_VERSION protocol version 31"
+  fi
+  exit 0
+fi
 [ -n "$FAKE_RSYNC_CALLS" ] && echo "$*" >> "$FAKE_RSYNC_CALLS"
 [ -n "$FAKE_RSYNC_ERROR" ] && echo "$FAKE_RSYNC_ERROR" >&2
 echo "Total transferred file size: ${FAKE_RSYNC_BYTES:-1,234} bytes"
@@ -54,8 +62,10 @@ def sandbox(tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", "%s%s%s" % (binDir, os.pathsep, os.environ["PATH"]))
     monkeypatch.setenv("FAKE_RSYNC_CALLS", str(tmp_path / "rsync_calls.txt"))
     monkeypatch.setattr(syncdata, "RSYNC_BIN", str(binDir / "rsync"))
+    monkeypatch.setattr(syncdata, "_rsyncProgressSupported", None)
     monkeypatch.setattr(syncdata, "ROOT", str(tmp_path))
     monkeypatch.setattr(syncdata, "LOCK_DIR", str(tmp_path))
+    monkeypatch.setattr(syncstate, "ROOT", str(tmp_path))
     monkeypatch.setattr(
         syncdata, "CONFIG", {"mattermostWebhookUrl": "https://mattermost.invalid/hook"}
     )

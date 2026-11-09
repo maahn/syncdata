@@ -26,6 +26,8 @@ debug_*.txt
 # Local tool settings and logs
 .claude/
 logs/
+state/
+*.egg-info/
 *.lock
 .env
 
